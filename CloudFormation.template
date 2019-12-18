@@ -1,0 +1,129 @@
+{
+  "Parameters": {
+    "queuename": {
+      "Type": "String"
+    },
+    "s3bucketname": {
+      "Type": "String"
+    },
+    "dynamoDbTableName": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "SQSQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {
+          "Ref": "queuename"
+        }
+      }
+    },
+    "SQSQueuePolicy": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Properties": {
+        "Queues": [
+          {
+            "Ref": "queuename"
+          }
+        ],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "*"
+              },
+              "Action": [
+                "sqs:*"
+              ],
+              "Resource": {
+                "Ref": "queuename"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "S3BucketMetaRepo": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Ref": "s3bucketname"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "NotificationConfiguration": {
+          "QueueConfigurations": [
+            {
+              "Queue": {
+                "Fn::GetAtt": [
+                  "SQSQueue",
+                  "Arn"
+                ]
+              },
+              "Event": "s3:ObjectCreated:*"
+            }
+          ]
+        }
+      }
+    },
+    "LambdaFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonSQSFullAccess",
+          "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess",
+          "arn:aws:iam::084394789889:policy/service-role/AWSLambdaBasicExecutionRole-f8c688d4-90c4-4818-9eb5-bcfd1d1ad0d4"
+        ]
+      }
+    },
+    "lamdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "ethans-sept19-durgeshk.dr",
+          "S3Key": "lambda.zip"
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaFunctionRole",
+            "Arn"
+          ]
+        },
+        "FunctionName": "metaRepoLambdaFunction",
+        "Runtime": "Python3.6"
+      }
+    },
+    "DDBT439FR": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": {
+          "Ref": "dynamoDbTableName"
+        },
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "versionID",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "eventTime",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "versionID",
+            "KeyType": "RANGE"
+          },
+          {
+            "AttributeName": "eventTime",
+            "KeyType": "RANGE"
+          }
+        ]
+      }
+    }
+  }
+}
